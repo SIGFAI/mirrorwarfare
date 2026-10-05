@@ -1,0 +1,346 @@
+use math_iw4::{angle_normalize_360, angle_subtract, yaw_vectors_2d};
+use movement_iw4::ANGLE2SHORT;
+use playerstate_iw4::{UserCmd, buttons};
+
+use crate::intent::{BotIntent, MotorReport, MoveMode, PathOutcome};
+use crate::observation::BotObservation;
+
+const MAX_YAW_DEG_PER_MS: f32 = 0.36;
+const MAX_PITCH_DEG_PER_MS: f32 = 0.24;
+const MAX_YAW_ACCEL_DEG_PER_MS2: f32 = 0.015;
+const MAX_PITCH_ACCEL_DEG_PER_MS2: f32 = 0.01;
+const FIRE_CONE_DEG: f32 = 8.0;
+const ARRIVE_IN: f32 = 24.0;
+const PITCH_LIMIT: f32 = 70.0;
+const STALL_SPEED: f32 = 40.0;
+const STALL_MS: i32 = 250;
+const JUMP_COOLDOWN_MS: i32 = 700;
+/// Horizontal reach (in) of a climb goal that triggers a jump: wallclimb wall
+/// distance (0.8 m from the body axis) plus a node's offset from the face.
+const CLIMB_GOAL_REACH: f32 = 48.0;
+const ROLL_FALL_SPEED: f32 = -420.0;
+const DROP_MOVE: i8 = 60;
+/// Aim error shrinks by this share over `SETTLE_MS` on one target (parkour maps).
+const SETTLE_GAIN: f32 = 0.85;
+const SETTLE_MS: f32 = 1500.0;
+const ADS_RANGE_IN: f32 = 600.0;
+
+#[derive(Clone, Debug)]
+pub struct Motor {
+    yaw: f32,
+    pitch: f32,
+    yaw_vel: f32,
+    pitch_vel: f32,
+    err_yaw: f32,
+    err_pitch: f32,
+    acquire_yaw: f32,
+    last_look: Option<[f32; 3]>,
+    armed: Option<sim::LifeSequence>,
+    stall_ms: i32,
+    jump_cooldown_ms: i32,
+    settle_ms: f32,
+}
+
+impl Motor {
+    pub fn new(seed: u64) -> Self {
+        let self_preserve = (((seed >> 8) & 0xff) as f32) / 255.0;
+        let spread = 0.75 + 0.75 * self_preserve;
+        let err_yaw = (((seed >> 3) & 0xffff) as f32 / 65535.0 - 0.5) * 4.0 * spread;
+        let err_pitch = (((seed >> 11) & 0xffff) as f32 / 65535.0 - 0.5) * 2.0 * spread;
+        Self {
+            yaw: 0.0,
+            pitch: 0.0,
+            yaw_vel: 0.0,
+            pitch_vel: 0.0,
+            err_yaw,
+            err_pitch,
+            acquire_yaw: 0.0,
+            last_look: None,
+            armed: None,
+            stall_ms: 0,
+            jump_cooldown_ms: 0,
+            settle_ms: 0.0,
+        }
+    }
+
+    pub fn report(&self, obs: &BotObservation, intent: &BotIntent, cmd: &UserCmd) -> MotorReport {
+        if matches!(intent.move_mode, MoveMode::Mantle | MoveMode::Ladder) {
+            return MotorReport::Unsupported;
+        }
+        if intent.path == PathOutcome::BudgetExhausted || intent.path == PathOutcome::ProgressLost {
+            return MotorReport::Executing;
+        }
+        if intent.path == PathOutcome::Blocked || intent.path == PathOutcome::Unreachable {
+            return MotorReport::Blocked;
+        }
+        if intent.move_mode == MoveMode::Drop {
+            let Some(goal) = intent.move_goal else {
+                return MotorReport::Executing;
+            };
+            if obs.self_state.origin[2] - goal[2] > crate::nav::STEP_Z_IN {
+                return MotorReport::Executing;
+            }
+            if dist2(obs.self_state.origin, goal) <= ARRIVE_IN * ARRIVE_IN {
+                return MotorReport::Arrived;
+            }
+            return MotorReport::Executing;
+        }
+        if intent.move_mode == MoveMode::Hold || (cmd.forwardmove == 0 && cmd.rightmove == 0) {
+            if let Some(goal) = intent.move_goal
+                && dist2(obs.self_state.origin, goal) <= ARRIVE_IN * ARRIVE_IN
+            {
+                return MotorReport::Arrived;
+            }
+            return MotorReport::Executing;
+        }
+        MotorReport::Executing
+    }
+
+    pub fn drive(&mut self, obs: &BotObservation, intent: &BotIntent, dt_ms: i32) -> UserCmd {
+        if self.armed != Some(obs.self_state.life_sequence) {
+            self.yaw = obs.self_state.viewangles[1];
+            self.pitch = angle_subtract(obs.self_state.viewangles[0], 0.0);
+            self.armed = Some(obs.self_state.life_sequence);
+        }
+        let dt = dt_ms.max(1) as f32;
+        // A climb needs the wall in front: face the step up unless shooting.
+        let look_at = match intent.move_goal {
+            Some(goal)
+                if obs.self_state.parkour.is_some() && !intent.fire && climb_goal(obs, goal) =>
+            {
+                let eye = obs.eye();
+                Some([goal[0], goal[1], eye[2]])
+            }
+            _ => intent.look_at,
+        };
+        if let Some(at) = look_at {
+            if self
+                .last_look
+                .is_none_or(|old| dist2(old, at) > 48.0 * 48.0)
+            {
+                self.acquire_yaw = 6.0;
+                self.settle_ms = 0.0;
+            }
+            self.last_look = Some(at);
+            self.acquire_yaw *= 0.85_f32.powf(dt / 16.0);
+            self.settle_ms += dt;
+            // Catalyst arenas are fought across rooftops: a bot holding on one
+            // target walks its aim error in, or it never lands a long shot.
+            let err = if obs.self_state.parkour.is_some() {
+                1.0 - SETTLE_GAIN * (self.settle_ms / SETTLE_MS).min(1.0)
+            } else {
+                1.0
+            };
+            let desire = look_angles(obs.eye(), at);
+            let (yaw, yaw_vel) = slew_yaw(
+                self.yaw,
+                desire[1] + self.err_yaw * err + self.acquire_yaw,
+                self.yaw_vel,
+                dt,
+            );
+            self.yaw = yaw;
+            self.yaw_vel = yaw_vel;
+            let (pitch, pitch_vel) = slew_pitch(
+                self.pitch,
+                desire[0] + self.err_pitch * err,
+                self.pitch_vel,
+                dt,
+            );
+            self.pitch = pitch;
+            self.pitch_vel = pitch_vel;
+        } else {
+            self.yaw_vel = 0.0;
+            self.pitch_vel = 0.0;
+            self.last_look = None;
+            self.settle_ms = 0.0;
+        }
+        let unsupported = matches!(intent.move_mode, MoveMode::Mantle | MoveMode::Ladder);
+        let walking = matches!(intent.move_mode, MoveMode::Walk | MoveMode::Drop)
+            && matches!(intent.path, PathOutcome::Clear | PathOutcome::ProgressLost);
+        let (mut forwardmove, mut rightmove) = (0i8, 0i8);
+        if !unsupported
+            && walking
+            && let Some(goal) = intent.move_goal
+        {
+            let wish = [
+                goal[0] - obs.self_state.origin[0],
+                goal[1] - obs.self_state.origin[1],
+            ];
+            (forwardmove, rightmove) = wish_to_move(self.yaw, wish);
+            // Catalyst air control cannot shed speed: step off drops slowly so
+            // the landing is the support the route chose.
+            if obs.self_state.parkour.is_some() && intent.move_mode == MoveMode::Drop {
+                forwardmove = forwardmove.clamp(-DROP_MOVE, DROP_MOVE);
+                rightmove = rightmove.clamp(-DROP_MOVE, DROP_MOVE);
+            }
+        }
+        // A requested weapon has to survive the whole change: the simulator
+        // settles a dropping hand back to ready when the command asks for the
+        // weapon it is already lowering.
+        let weapon = intent.weapon.unwrap_or(obs.self_state.weapon);
+        let delta = obs.self_state.delta_angles;
+        let mut cmd = UserCmd {
+            server_time: obs.time_ms,
+            angles: [
+                ((self.pitch - delta[0]) * ANGLE2SHORT) as i32,
+                ((self.yaw - delta[1]) * ANGLE2SHORT) as i32,
+                0,
+            ],
+            forwardmove,
+            rightmove,
+            weapon,
+            weapon_mapped: weapon,
+            ..UserCmd::default()
+        };
+        if intent.fire && self.weapon_on_target(obs, intent) {
+            cmd.buttons |= buttons::ATTACK;
+        }
+        // Hip fire does not carry across a street: aim down sights at range.
+        if obs.self_state.parkour.is_some()
+            && intent.fire
+            && intent
+                .look_at
+                .is_some_and(|at| dist2(obs.eye(), at) > ADS_RANGE_IN * ADS_RANGE_IN)
+        {
+            cmd.buttons |= buttons::ADS;
+        }
+        if intent.use_button {
+            cmd.buttons |= buttons::USE;
+        }
+        if intent.reload {
+            cmd.buttons |= buttons::RELOAD;
+        }
+        if intent.sprint
+            && walking
+            && intent.move_mode == MoveMode::Walk
+            && forwardmove > 110
+            && rightmove.abs() < 45
+            && !intent.fire
+            && !intent.use_button
+            && !intent.reload
+            && !intent.crouch
+        {
+            cmd.buttons |= buttons::SPRINT;
+        }
+        if intent.crouch {
+            cmd.buttons |= buttons::CROUCH;
+        }
+        if let Some(mode) = obs.self_state.parkour {
+            cmd.buttons |= self.parkour_buttons(obs, intent, mode, forwardmove, dt_ms);
+        }
+        cmd
+    }
+
+    /// Catalyst movement has no mantle: a bot that runs into a wall or a
+    /// ledge jumps (the movement turns that into a vault, ledge climb or
+    /// wallclimb), and it rolls out of long drops.
+    fn parkour_buttons(
+        &mut self,
+        obs: &BotObservation,
+        intent: &BotIntent,
+        mode: sim::MecMode,
+        forwardmove: i8,
+        dt_ms: i32,
+    ) -> u32 {
+        let me = &obs.self_state;
+        let speed = (me.velocity[0] * me.velocity[0] + me.velocity[1] * me.velocity[1]).sqrt();
+        self.jump_cooldown_ms = (self.jump_cooldown_ms - dt_ms).max(0);
+        let pushing = forwardmove > 64
+            && matches!(mode, sim::MecMode::Ground | sim::MecMode::Air)
+            && me.velocity[2].abs() < 60.0;
+        self.stall_ms = if pushing && speed < STALL_SPEED {
+            self.stall_ms + dt_ms
+        } else {
+            0
+        };
+        let climb_goal = intent.move_goal.is_some_and(|goal| climb_goal(obs, goal));
+        let mut bits = 0;
+        if pushing && self.jump_cooldown_ms == 0 && (self.stall_ms >= STALL_MS || climb_goal) {
+            bits |= buttons::JUMP;
+            self.jump_cooldown_ms = JUMP_COOLDOWN_MS;
+            self.stall_ms = 0;
+        }
+        if mode == sim::MecMode::WallClimb && forwardmove > 0 {
+            bits |= buttons::JUMP;
+        }
+        if !me.on_ground && me.velocity[2] < ROLL_FALL_SPEED && mode == sim::MecMode::Air {
+            bits |= buttons::CROUCH;
+        }
+        bits
+    }
+
+    fn weapon_on_target(&self, obs: &BotObservation, intent: &BotIntent) -> bool {
+        let Some(at) = intent.look_at else {
+            return false;
+        };
+        let desire = look_angles(obs.eye(), at);
+        angle_subtract(desire[1], self.yaw).abs() <= FIRE_CONE_DEG
+            && (desire[0] - self.pitch).abs() <= FIRE_CONE_DEG
+    }
+}
+
+fn look_angles(from: [f32; 3], to: [f32; 3]) -> [f32; 3] {
+    let mut angles = math_iw4::vect_to_angles([to[0] - from[0], to[1] - from[1], to[2] - from[2]]);
+    // vect_to_angles wraps upward pitch into [0, 360); the motor clamps
+    // and compares pitch in the signed range.
+    angles[0] = angle_subtract(angles[0], 0.0);
+    angles
+}
+
+fn slew_yaw(current: f32, desire: f32, vel: f32, dt: f32) -> (f32, f32) {
+    let err = angle_subtract(desire, current);
+    let (delta, vel) = slew_vel(err, vel, MAX_YAW_DEG_PER_MS, MAX_YAW_ACCEL_DEG_PER_MS2, dt);
+    (angle_normalize_360(current + delta), vel)
+}
+
+fn slew_pitch(current: f32, desire: f32, vel: f32, dt: f32) -> (f32, f32) {
+    let desire = desire.clamp(-PITCH_LIMIT, PITCH_LIMIT);
+    let err = desire - current;
+    let (delta, vel) = slew_vel(
+        err,
+        vel,
+        MAX_PITCH_DEG_PER_MS,
+        MAX_PITCH_ACCEL_DEG_PER_MS2,
+        dt,
+    );
+    ((current + delta).clamp(-PITCH_LIMIT, PITCH_LIMIT), vel)
+}
+
+fn slew_vel(err: f32, vel: f32, max_rate: f32, max_accel: f32, dt: f32) -> (f32, f32) {
+    let want = (err / dt).clamp(-max_rate, max_rate);
+    let vel =
+        (vel + (want - vel).clamp(-max_accel * dt, max_accel * dt)).clamp(-max_rate, max_rate);
+    (vel * dt, vel)
+}
+
+fn wish_to_move(yaw_deg: f32, wish: [f32; 2]) -> (i8, i8) {
+    let len = (wish[0] * wish[0] + wish[1] * wish[1]).sqrt();
+    if len < 1.0 {
+        return (0, 0);
+    }
+    let (forward, right) = yaw_vectors_2d(yaw_deg);
+    let f = (wish[0] * forward[0] + wish[1] * forward[1]) / len;
+    let r = (wish[0] * right[0] + wish[1] * right[1]) / len;
+    (
+        (f * 127.0).round().clamp(-127.0, 127.0) as i8,
+        (r * 127.0).round().clamp(-127.0, 127.0) as i8,
+    )
+}
+
+fn dist2(a: [f32; 3], b: [f32; 3]) -> f32 {
+    let dx = a[0] - b[0];
+    let dy = a[1] - b[1];
+    let dz = a[2] - b[2];
+    dx * dx + dy * dy + dz * dz
+}
+
+/// The next point is a step up within reach of a wallclimb or ledge climb.
+/// Close only: a jump further out is a plain jump, and the Catalyst jump table
+/// boosts it (up to 8 m/s) — enough to carry a bot off a roof.
+fn climb_goal(obs: &BotObservation, goal: [f32; 3]) -> bool {
+    let me = &obs.self_state;
+    let dx = goal[0] - me.origin[0];
+    let dy = goal[1] - me.origin[1];
+    goal[2] - me.origin[2] > crate::nav::STEP_Z_IN
+        && dx * dx + dy * dy < CLIMB_GOAL_REACH * CLIMB_GOAL_REACH
+}

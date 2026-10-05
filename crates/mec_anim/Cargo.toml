@@ -1,0 +1,16 @@
+[package]
+name = "mec_anim"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Mirror's Edge Catalyst third-person clip pack (Faith's decoded ANT clips): load, sample, retarget onto an IW4 DObj."
+
+[dependencies]
+anim_iw4.workspace = true
+glam.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+xmodel_runtime.workspace = true
+
+[lints]
+workspace = true
