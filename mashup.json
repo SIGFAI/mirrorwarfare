@@ -1,0 +1,197 @@
+{
+  "id": "sigf/mirrorwarfare",
+  "version": "0.1.0",
+  "name": "Mirrorwarfare",
+  "tagline": "Mirror's Edge Catalyst parkour with Modern Warfare 2 guns: wallrun, vault and slide through a free-for-all against bots on MW2's own assets.",
+  "kind": "mashup",
+  "games": [
+    {
+      "game": "mw2",
+      "role": "host",
+      "label": "Call of Duty: Modern Warfare 2 (2009)",
+      "engine": "iw4L (Rust, wgpu): its own engine reading MW2 multiplayer assets from the player's install",
+      "apps": {
+        "steam": "10190"
+      },
+      "runtime": "MW2 (2009) multiplayer, Steam"
+    },
+    {
+      "game": "mirrorsedge-catalyst",
+      "role": "guest",
+      "label": "Mirror's Edge Catalyst",
+      "uses": "movement re-made in Rust; Faith's animations and city arenas only when the player extracts them from their own install (optional)",
+      "apps": {
+        "steam": "1233570"
+      }
+    }
+  ],
+  "requires": [],
+  "install": [
+    {
+      "game": "mw2",
+      "strategy": "game-dir-snapshot",
+      "files": [
+        {
+          "src": "mirrorwarfare-mw2.zip",
+          "dst": "{game}",
+          "unpack": true,
+          "contents": [
+            {
+              "path": "iw4l.exe",
+              "sha256": "d33bc1690ab99f3aae064f082e6d48f53e5aab5ee77047589bec6f1578be5d31"
+            },
+            {
+              "path": "mec-arenas/testbox/arena.glb",
+              "sha256": "8e8c581fae7f51b862a23efeb88806ee646de0202f53273865b0c15faa1c870c"
+            },
+            {
+              "path": "mec-arenas/testbox/arena.json",
+              "sha256": "03bf515b16be00a2af58edf610c434385ef352cb1e1ad6d6a866ef777e9183cc"
+            },
+            {
+              "path": "mec-arenas/testbox/collision.glb",
+              "sha256": "a48dd0a8d655dcdcbcf58a5f1375cd335f577aa7650abdbc5092163ba8eb9fc5"
+            },
+            {
+              "path": "mec-arenas/testbox/route.json",
+              "sha256": "60849169081220f72af8729d73bfe0bbcf23a80247cd7904881dab06ded749ae"
+            },
+            {
+              "path": "mec-arenas/testbox/routes/hard.json",
+              "sha256": "4b5013bef4377191872b7c5ecb5d27c00bfeb3256fc1ba1cb1e6386d26198022"
+            },
+            {
+              "path": "mec-arenas/testbox/routes/jumps.json",
+              "sha256": "23e8d6e25406682b891c1ffdfaa4f3d0a0fc9d949d3fb4e254b371431e67f62b"
+            },
+            {
+              "path": "mec-arenas/testbox/routes/roll.json",
+              "sha256": "49bedb643133045ccc82e15a33f91d7cfad213ceb643432f1a289d731ba3c486"
+            },
+            {
+              "path": "mec-arenas/testbox/routes/sprint.json",
+              "sha256": "afe01fe39e0c62ea89d0bf527599d1ef1b2447443c79dc902ec554e4dfe2e39f"
+            },
+            {
+              "path": "mec-arenas/testbox/routes/vault.json",
+              "sha256": "60ef2b913212d848464d3acd3e6a5abeaf0fc5dca14510d5ae71dd3bc7a50116"
+            },
+            {
+              "path": "mec-arenas/testbox/routes/wall_turn.json",
+              "sha256": "31d03ba050837bc1b77665dbcdceb0489f364baafdee285d0113c8d8cc876fe8"
+            },
+            {
+              "path": "mec-arenas/testbox/routes/wallclimb.json",
+              "sha256": "06db6c4aa2cd05bf080b8c10f8e99f3fd25430c09490d0c685efdaee5bd70b15"
+            },
+            {
+              "path": "mec-arenas/testbox/routes/wallrun_ads.json",
+              "sha256": "67796030c3fc7aba6f3b3ed5d3513969a6507085839cc2e4b9884b30ba8b8ce1"
+            },
+            {
+              "path": "mec-arenas/testbox/routes/wallrun_fire.json",
+              "sha256": "a8714eb81d1617b92f061a654aaf727c29ab849d937a8878681dd839c407a0b9"
+            },
+            {
+              "path": "mec-arenas/testbox/routes/wallrun.json",
+              "sha256": "3d05c41a3623416da429f5912d6a8ca3d717ddd82059036b0c9de16fd52b530c"
+            },
+            {
+              "path": "mirrorwarfare-licenses/LICENSE",
+              "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+            },
+            {
+              "path": "mirrorwarfare-licenses/NOTICE",
+              "sha256": "826845ab45578adfad0426fba907dd07e107fb2381f4a9da1338ffbca2e1d2b6"
+            },
+            {
+              "path": "mirrorwarfare-licenses/THIRD-PARTY-LICENSES.txt",
+              "sha256": "617d9e3611a33d7ad988579e5c6580d5b404bbfe843191b179df14acc9d5b01f"
+            }
+          ],
+          "url": "https://github.com/SIGFAI/mirrorwarfare/releases/download/v0.1.0/mirrorwarfare-mw2.zip",
+          "sha256": "af21678dc87a8c64231bf99d2591b916351e27ec5b33b365aeb9107167bad2ee",
+          "size": 35644502
+        }
+      ]
+    }
+  ],
+  "launch": [
+    {
+      "game": "mw2",
+      "exe": "iw4l.exe",
+      "args": [
+        "map",
+        "mec:testbox",
+        "--cmds",
+        "wait world; bot add 7"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "name": "mirrorwarfare-mw2.zip",
+      "url": "https://github.com/SIGFAI/mirrorwarfare/releases/download/v0.1.0/mirrorwarfare-mw2.zip",
+      "sha256": "af21678dc87a8c64231bf99d2591b916351e27ec5b33b365aeb9107167bad2ee",
+      "size": 35644502
+    }
+  ],
+  "source": {
+    "repo": "https://github.com/r614/mirrorwarfare",
+    "license": "Apache-2.0",
+    "upstream_license": "Apache-2.0",
+    "commit": "10d36974ca0ae4131bb5e59b2421c49dc7ac6c4f",
+    "hosted": "https://github.com/SIGFAI/mirrorwarfare",
+    "derived_from": {
+      "repo": "https://github.com/vladtrc/iw4L",
+      "license": "Apache-2.0"
+    },
+    "built": {
+      "by": "SIGF",
+      "commit": "10d36974ca0ae4131bb5e59b2421c49dc7ac6c4f",
+      "builder": "AWS EC2 i-0022be8314df37721 (c6i.4xlarge, Windows Server 2022, terminated after the build)",
+      "artifacts": {
+        "iw4l.exe": "d33bc1690ab99f3aae064f082e6d48f53e5aab5ee77047589bec6f1578be5d31",
+        "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "mec-arenas/testbox/arena.glb": "8e8c581fae7f51b862a23efeb88806ee646de0202f53273865b0c15faa1c870c",
+        "mec-arenas/testbox/arena.json": "03bf515b16be00a2af58edf610c434385ef352cb1e1ad6d6a866ef777e9183cc",
+        "mec-arenas/testbox/collision.glb": "a48dd0a8d655dcdcbcf58a5f1375cd335f577aa7650abdbc5092163ba8eb9fc5",
+        "mec-arenas/testbox/route.json": "60849169081220f72af8729d73bfe0bbcf23a80247cd7904881dab06ded749ae",
+        "mec-arenas/testbox/routes/hard.json": "4b5013bef4377191872b7c5ecb5d27c00bfeb3256fc1ba1cb1e6386d26198022",
+        "mec-arenas/testbox/routes/jumps.json": "23e8d6e25406682b891c1ffdfaa4f3d0a0fc9d949d3fb4e254b371431e67f62b",
+        "mec-arenas/testbox/routes/roll.json": "49bedb643133045ccc82e15a33f91d7cfad213ceb643432f1a289d731ba3c486",
+        "mec-arenas/testbox/routes/sprint.json": "afe01fe39e0c62ea89d0bf527599d1ef1b2447443c79dc902ec554e4dfe2e39f",
+        "mec-arenas/testbox/routes/vault.json": "60ef2b913212d848464d3acd3e6a5abeaf0fc5dca14510d5ae71dd3bc7a50116",
+        "mec-arenas/testbox/routes/wall_turn.json": "31d03ba050837bc1b77665dbcdceb0489f364baafdee285d0113c8d8cc876fe8",
+        "mec-arenas/testbox/routes/wallclimb.json": "06db6c4aa2cd05bf080b8c10f8e99f3fd25430c09490d0c685efdaee5bd70b15",
+        "mec-arenas/testbox/routes/wallrun.json": "3d05c41a3623416da429f5912d6a8ca3d717ddd82059036b0c9de16fd52b530c",
+        "mec-arenas/testbox/routes/wallrun_ads.json": "67796030c3fc7aba6f3b3ed5d3513969a6507085839cc2e4b9884b30ba8b8ce1",
+        "mec-arenas/testbox/routes/wallrun_fire.json": "a8714eb81d1617b92f061a654aaf727c29ab849d937a8878681dd839c407a0b9",
+        "NOTICE": "826845ab45578adfad0426fba907dd07e107fb2381f4a9da1338ffbca2e1d2b6",
+        "THIRD-PARTY-LICENSES.txt": "617d9e3611a33d7ad988579e5c6580d5b404bbfe843191b179df14acc9d5b01f"
+      }
+    }
+  },
+  "media": {},
+  "built_by": {
+    "author": "r614",
+    "authors": [
+      "r614",
+      "vladtrc"
+    ],
+    "packaged_by": "SIGF"
+  },
+  "idea_by": "r614",
+  "built_at": "2026-10-05T00:00:00.000Z",
+  "status": "beta",
+  "issues": "https://github.com/r614/mirrorwarfare/issues",
+  "notes": [
+    "You need Call of Duty: Modern Warfare 2 (2009) multiplayer installed through Steam. Mirror's Edge Catalyst is optional (only for Faith's animations and the city arenas). Windows only.",
+    "The app adds iw4l.exe (Mirrorwarfare's own engine, built by SIGF from the upstream source), the Parkour Playground arena (mec-arenas\\testbox) and the licenses to the MW2 folder; Restore removes them. iw4l.exe writes its logs and caches to iw4l-artifacts\\ beside it: delete that folder after Restore if you want the MW2 folder exactly as before.",
+    "To play, start iw4l.exe in the MW2 folder with: map mec:testbox --cmds \"wait world; bot add 7\" (free-for-all with 7 bots; \"bot add 0\" to practise alone, or \"menu\" for Private Match > Game Setup > Change Map > CATALYST). Do not start MW2 itself from Steam: that is the official game, not the mod.",
+    "Controls: W runs (speed builds up over about 3 s), Space wallruns, wallclimbs, vaults and grabs ledges, C slides and rolls, Q turns 180 degrees, mouse fires MW2 weapons. Type thirdperson in the console (~) to watch the body.",
+    "Optional Catalyst data: upstream's tools\\mec\\setup.ps1 (from the upstream repo, about 45 GB free space) extracts Faith's animations and city arenas from your own Catalyst install; without it the stock MW2 animations are used.",
+    "Offline against bots, or private matches on iw4L's own servers; it never touches official MW2 servers. Only free-for-all is tuned; online play between machines is untested upstream.",
+    "SIGF build of 10d3697 (no upstream release). Beta: report bugs to the author on the upstream issue tracker."
+  ]
+}
