@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "name": "Mirrorwarfare",
   "tagline": "Mirror's Edge Catalyst parkour with Modern Warfare 2 guns: wallrun, vault and slide through a free-for-all against bots on MW2's own assets.",
+  "how_to_play": [
+    "Fight a free-for-all against 7 bots on the Parkour Playground with MW2 guns and Mirror's Edge parkour.",
+    "Press Play to start straight in the arena with the bots.",
+    "Hold W to run (speed builds over about 3 s), Space jumps, wallruns, wallclimbs, vaults and grabs ledges.",
+    "C slides and rolls, Q turns 180 degrees; mouse fires, R reloads, V melee, F/G grenades.",
+    "Type thirdperson in the console (~) to watch your body."
+  ],
   "kind": "mashup",
   "games": [
     {
