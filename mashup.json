@@ -4,11 +4,11 @@
   "name": "Mirrorwarfare",
   "tagline": "Mirror's Edge Catalyst parkour with Modern Warfare 2 guns: wallrun, vault and slide through a free-for-all against bots on MW2's own assets.",
   "how_to_play": [
-    "Fight a free-for-all against 7 bots on the Parkour Playground with MW2 guns and Mirror's Edge parkour.",
-    "Press Play to start straight in the arena with the bots.",
-    "Hold W to run (speed builds over about 3 s), Space jumps, wallruns, wallclimbs, vaults and grabs ledges.",
-    "C slides and rolls, Q turns 180 degrees; mouse fires, R reloads, V melee, F/G grenades.",
-    "Type thirdperson in the console (~) to watch your body."
+    "Fight a free-for-all against bots with MW2 (2009) maps and guns plus Mirror's Edge Catalyst parkour: wallruns, vaults, slides and ledge grabs.",
+    "Press Play: the app starts iw4l.exe from your MW2 folder (not MW2 itself) straight into the Parkour Playground with 7 bots.",
+    "W runs (speed builds over about 3 s, no sprint key), Space jumps, wallruns, wallclimbs, vaults and grabs ledges.",
+    "C slides and rolls, Q turns 180 degrees, mouse fires MW2 weapons (R reload, V melee, F/G grenades).",
+    "Type thirdperson in the console (~) to watch the body."
   ],
   "kind": "mashup",
   "games": [
@@ -193,9 +193,7 @@
   "status": "beta",
   "issues": "https://github.com/r614/mirrorwarfare/issues",
   "notes": [
-    "How it works: a free-for-all against bots in Mirrorwarfare's own engine, which loads MW2 (2009) maps and guns from your install and adds Mirror's Edge Catalyst parkour: wallruns, vaults, slides and ledge grabs on the Parkour Playground arena.",
-    "Press Play: the app starts iw4l.exe from your MW2 folder (not MW2 itself) straight into the Parkour Playground with 7 bots. By hand: run iw4l.exe there with map mec:testbox --cmds \"wait world; bot add 7\" (\"bot add 0\" to practise alone). Never start MW2 from Steam for this.",
-    "Controls: W runs (speed builds over about 3 s, no sprint key), Space jumps, wallruns, wallclimbs, vaults and grabs ledges, C slides and rolls, Q turns 180 degrees, mouse fires MW2 weapons (R reload, V melee, F/G grenades). Type thirdperson in the console (~) to watch the body.",
+    "Never start MW2 from Steam for this. By hand: run iw4l.exe in your MW2 folder with map mec:testbox --cmds \"wait world; bot add 7\" (\"bot add 0\" to practise alone).",
     "You need Call of Duty: Modern Warfare 2 (2009) multiplayer installed through Steam; Windows only. Mirror's Edge Catalyst is optional: upstream's tools\\mec\\setup.ps1 (about 45 GB free) extracts Faith's animations and city arenas from your own copy; without it stock MW2 animations are used.",
     "Offline against bots, or private matches on iw4L's own servers; it never touches official MW2 servers. Only free-for-all is tuned, bots find parkour routes by trial, third person is not fully 1:1, and online play between machines is untested.",
     "Restore removes iw4l.exe, the arena and the licenses but leaves the iw4l-artifacts folder (logs, caches) in the MW2 folder: delete it by hand if you want. Beta: report bugs to the author with the Report a bug link."
